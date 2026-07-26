@@ -457,8 +457,8 @@ void App::Render() {
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 #else
     int fbW = width, fbH = height;
-    if (m_window && m_window->GetGLFWWindow()) {
-        glfwGetFramebufferSize(m_window->GetGLFWWindow(), &fbW, &fbH);
+    if (m_window && m_window->GetImpl() && m_window->GetImpl()->GetGLFWWindow()) {
+        glfwGetFramebufferSize(m_window->GetImpl()->GetGLFWWindow(), &fbW, &fbH);
     }
     glViewport(0, 0, fbW, fbH);
     glClearColor(0.035f, 0.035f, 0.05f, 1.0f);
