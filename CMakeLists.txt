@@ -82,8 +82,11 @@ else()
         glfw
         OpenGL::GL
     )
-    if(X11_FOUND AND X11_Xext_LIB)
-        target_link_libraries(SimpleApp PRIVATE ${X11_Xext_LIB})
+    if(X11_FOUND)
+        target_link_libraries(SimpleApp PRIVATE ${X11_LIBRARIES})
+        if(X11_Xext_LIB)
+            target_link_libraries(SimpleApp PRIVATE ${X11_Xext_LIB})
+        endif()
     endif()
     target_compile_definitions(SimpleApp PRIVATE IMGUI_USE_WCHAR32)
 endif()
