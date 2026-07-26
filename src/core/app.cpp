@@ -18,7 +18,9 @@
 #include "imgui_impl_win32.h"
 #include <d3d11.h>
 #else
+#include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+#include <GLFW/glfw3.h>
 #include <GL/gl.h>
 #endif
 
@@ -39,6 +41,7 @@ App::~App() {
     ImGui_ImplWin32_Shutdown();
 #else
     ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
 #endif
     ImGui::DestroyContext();
 }
@@ -63,6 +66,7 @@ void App::InitImGui() {
     ImGui_ImplWin32_Init(m_window->GetImpl()->GetHWND());
     ImGui_ImplDX11_Init(m_window->GetImpl()->GetD3DDevice(), m_window->GetImpl()->GetD3DDeviceContext());
 #else
+    ImGui_ImplGlfw_InitForOpenGL(m_window->GetImpl()->GetGLFWWindow(), true);
     ImGui_ImplOpenGL3_Init("#version 330");
 #endif
 }
@@ -389,6 +393,7 @@ void App::Render() {
     ImGui_ImplWin32_NewFrame();
 #else
     ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
 #endif
     ImGui::NewFrame();
 
