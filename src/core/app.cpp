@@ -412,6 +412,17 @@ void App::Render() {
     float fWidth  = static_cast<float>(width);
     float fHeight = static_cast<float>(height);
 
+#ifndef _WIN32
+    float       rounding   = (m_window && m_window->IsMaximized()) ? 0.0f : 10.0f;
+    ImDrawList* bgDrawList = ImGui::GetBackgroundDrawList();
+    bgDrawList->AddRectFilled(
+        ImVec2(0, 0),
+        ImVec2(fWidth, fHeight),
+        ImGui::GetColorU32(ImVec4(0.035f, 0.035f, 0.05f, 1.0f)),
+        rounding
+    );
+#endif
+
     m_gridBackground.Render(ImGui::GetBackgroundDrawList(), fWidth, fHeight);
 
     ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -444,6 +455,19 @@ void App::Render() {
         CloseModal();
     }
 
+#ifndef _WIN32
+    if (m_window && !m_window->IsMaximized()) {
+        ImGui::GetForegroundDrawList()->AddRect(
+            ImVec2(0, 0),
+            ImVec2(fWidth, fHeight),
+            ImGui::GetColorU32(ImVec4(0.20f, 0.20f, 0.25f, 0.60f)),
+            10.0f,
+            ImDrawFlags_None,
+            1.5f
+        );
+    }
+#endif
+
     ImGui::End();
 
     ImGui::Render();
@@ -457,7 +481,7 @@ void App::Render() {
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 #else
     glViewport(0, 0, width, height);
-    glClearColor(0.035f, 0.035f, 0.05f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     ImFontAtlas* atlas = ImGui::GetIO().Fonts;

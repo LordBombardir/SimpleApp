@@ -36,6 +36,7 @@ public:
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
         glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+        glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GLFW_TRUE);
 
         m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
         if (!m_window) return false;
@@ -176,24 +177,104 @@ public:
     }
 
     void UpdateDragging() override {
-        if (!m_window || !m_isDragging) return;
+        if (!m_window) return;
 
-        if (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) != GLFW_PRESS) {
-            m_isDragging = false;
-            return;
-        }
+        double cursorX = 0.0, cursorY = 0.0;
+        glfwGetCursorPos(m_window, &cursorX, &cursorY);
 
-        double currentX = 0.0, currentY = 0.0;
-        glfwGetCursorPos(m_window, &currentX, &currentY);
+        int winW = 0, winH = 0;
+        GetSize(winW, winH);
 
         int winX = 0, winY = 0;
         glfwGetWindowPos(m_window, &winX, &winY);
 
-        int deltaX = static_cast<int>(currentX - m_dragClickX);
-        int deltaY = static_cast<int>(currentY - m_dragClickY);
+        bool isLeftPressed = (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
 
-        if (deltaX != 0 || deltaY != 0) {
-            glfwSetWindowPos(m_window, winX + deltaX, winY + deltaY);
+        // Titlebar dragging
+        if (m_isDragging) {
+            if (!isLeftPressed) {
+                m_isDragging = false;
+                return;
+            }
+
+            int deltaX = static_cast<int>(cursorX - m_dragClickX);
+            int deltaY = static_cast<int>(cursorY - m_dragClickY);
+
+            if (deltaX != 0 || deltaY != 0) {
+                glfwSetWindowPos(m_window, winX + deltaX, winY + deltaY);
+            }
+            return;
+        }
+
+        // Border resizing
+        if (m_isResizing) {
+            if (!isLeftPressed) {
+                m_isResizing = false;
+                m_resizeEdge = ResizeEdge::None;
+                return;
+            }
+
+            double screenMouseX = winX + cursorX;
+            double screenMouseY = winY + cursorY;
+
+            int deltaX = static_cast<int>(screenMouseX - m_resizeStartMouseX);
+            int deltaY = static_cast<int>(screenMouseY - m_resizeStartMouseY);
+
+            int newX = m_resizeStartWinX;
+            int newY = m_resizeStartWinY;
+            int newW = m_resizeStartWinW;
+            int newH = m_resizeStartWinH;
+
+            if (m_resizeEdge == ResizeEdge::Left || m_resizeEdge == ResizeEdge::TopLeft
+                || m_resizeEdge == ResizeEdge::BottomLeft) {
+                newW = m_resizeStartWinW - deltaX;
+                if (newW < m_minWidth) {
+                    deltaX = m_resizeStartWinW - m_minWidth;
+                    newW   = m_minWidth;
+                }
+                newX = m_resizeStartWinX + deltaX;
+            } else if (
+                m_resizeEdge == ResizeEdge::Right || m_resizeEdge == ResizeEdge::TopRight
+                || m_resizeEdge == ResizeEdge::BottomRight
+            ) {
+                newW = m_resizeStartWinW + deltaX;
+                if (newW < m_minWidth) newW = m_minWidth;
+            }
+
+            if (m_resizeEdge == ResizeEdge::Top || m_resizeEdge == ResizeEdge::TopLeft
+                || m_resizeEdge == ResizeEdge::TopRight) {
+                newH = m_resizeStartWinH - deltaY;
+                if (newH < m_minHeight) {
+                    deltaY = m_resizeStartWinH - m_minHeight;
+                    newH   = m_minHeight;
+                }
+                newY = m_resizeStartWinY + deltaY;
+            } else if (
+                m_resizeEdge == ResizeEdge::Bottom || m_resizeEdge == ResizeEdge::BottomLeft
+                || m_resizeEdge == ResizeEdge::BottomRight
+            ) {
+                newH = m_resizeStartWinH + deltaY;
+                if (newH < m_minHeight) newH = m_minHeight;
+            }
+
+            glfwSetWindowPos(m_window, newX, newY);
+            glfwSetWindowSize(m_window, newW, newH);
+            return;
+        }
+
+        // Hover detection for border resizing
+        if (!IsMaximized() && m_resizeEnabled) {
+            ResizeEdge edge = GetResizeEdgeAt(cursorX, cursorY, winW, winH);
+            if (edge != ResizeEdge::None && isLeftPressed && !m_isResizing) {
+                m_isResizing        = true;
+                m_resizeEdge        = edge;
+                m_resizeStartMouseX = winX + cursorX;
+                m_resizeStartMouseY = winY + cursorY;
+                m_resizeStartWinX   = winX;
+                m_resizeStartWinY   = winY;
+                m_resizeStartWinW   = winW;
+                m_resizeStartWinH   = winH;
+            }
         }
     }
 
@@ -210,16 +291,45 @@ public:
 #endif
 
 private:
-    GLFWwindow*        m_window          = nullptr;
+    enum class ResizeEdge { None, Left, Right, Top, Bottom, TopLeft, TopRight, BottomLeft, BottomRight };
+
+    ResizeEdge GetResizeEdgeAt(double cursorX, double cursorY, int winW, int winH) const {
+        const double MARGIN = 8.0;
+        bool left   = cursorX >= 0.0 && cursorX <= MARGIN;
+        bool right  = cursorX >= (winW - MARGIN) && cursorX <= winW;
+        bool top    = cursorY >= 0.0 && cursorY <= MARGIN;
+        bool bottom = cursorY >= (winH - MARGIN) && cursorY <= winH;
+
+        if (top && left) return ResizeEdge::TopLeft;
+        if (top && right) return ResizeEdge::TopRight;
+        if (bottom && left) return ResizeEdge::BottomLeft;
+        if (bottom && right) return ResizeEdge::BottomRight;
+        if (left) return ResizeEdge::Left;
+        if (right) return ResizeEdge::Right;
+        if (top) return ResizeEdge::Top;
+        if (bottom) return ResizeEdge::Bottom;
+
+        return ResizeEdge::None;
+    }
+
+    GLFWwindow*        m_window              = nullptr;
     std::weak_ptr<App> m_app;
-    Window*              m_parent          = nullptr;
-    int                  m_minWidth        = 900;
-    int                  m_minHeight       = 690;
-    bool                 m_maximizeEnabled = true;
-    bool                 m_resizeEnabled   = true;
-    bool                 m_isDragging      = false;
-    double               m_dragClickX      = 0.0;
-    double               m_dragClickY      = 0.0;
+    Window*              m_parent              = nullptr;
+    int                  m_minWidth            = 900;
+    int                  m_minHeight           = 690;
+    bool                 m_maximizeEnabled     = true;
+    bool                 m_resizeEnabled       = true;
+    bool                 m_isDragging          = false;
+    double               m_dragClickX          = 0.0;
+    double               m_dragClickY          = 0.0;
+    bool                 m_isResizing          = false;
+    ResizeEdge           m_resizeEdge          = ResizeEdge::None;
+    double               m_resizeStartMouseX   = 0.0;
+    double               m_resizeStartMouseY   = 0.0;
+    int                  m_resizeStartWinX     = 0;
+    int                  m_resizeStartWinY     = 0;
+    int                  m_resizeStartWinW     = 0;
+    int                  m_resizeStartWinH     = 0;
 };
 
 std::unique_ptr<INativeWindow>
