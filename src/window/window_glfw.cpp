@@ -204,9 +204,6 @@ public:
         double cursorX = 0.0, cursorY = 0.0;
         glfwGetCursorPos(m_window, &cursorX, &cursorY);
 
-        int winW = 0, winH = 0;
-        GetSize(winW, winH);
-
         int winX = 0, winY = 0;
         glfwGetWindowPos(m_window, &winX, &winY);
 
@@ -225,8 +222,22 @@ public:
             if (deltaX != 0 || deltaY != 0) {
                 glfwSetWindowPos(m_window, winX + deltaX, winY + deltaY);
             }
-            return;
         }
+    }
+
+    void UpdateBorderResizing() {
+        if (!m_window) return;
+
+        double cursorX = 0.0, cursorY = 0.0;
+        glfwGetCursorPos(m_window, &cursorX, &cursorY);
+
+        int winW = 0, winH = 0;
+        GetSize(winW, winH);
+
+        int winX = 0, winY = 0;
+        glfwGetWindowPos(m_window, &winX, &winY);
+
+        bool isLeftPressed = (glfwGetMouseButton(m_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
 
         // Border resizing
         if (m_isResizing) {
@@ -288,7 +299,7 @@ public:
         // Hover detection for border resizing
         if (!IsMaximized() && m_resizeEnabled) {
             ResizeEdge edge = GetResizeEdgeAt(cursorX, cursorY, winW, winH);
-            if (edge != ResizeEdge::None && isLeftPressed && !m_isResizing) {
+            if (edge != ResizeEdge::None && isLeftPressed && !m_isResizing && !m_isDragging) {
                 m_isResizing        = true;
                 m_resizeEdge        = edge;
                 m_resizeStartMouseX = winX + cursorX;
@@ -352,6 +363,9 @@ public:
 #endif
 
 private:
+    void UpdateBorderResizing();
+    void UpdateNativeWindowRounding();
+
     enum class ResizeEdge { None, Left, Right, Top, Bottom, TopLeft, TopRight, BottomLeft, BottomRight };
 
     ResizeEdge GetResizeEdgeAt(double cursorX, double cursorY, int winW, int winH) const {
