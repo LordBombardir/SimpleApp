@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base-static",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "C:/Program Files/Microsoft Visual Studio/18/Community/VC/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static"
+      },
+      "environment": {
+        "LOCALAPPDATA": "C:/Users/Andrey/AppData/Local",
+        "HOME": "C:/Users/Andrey",
+        "USERPROFILE": "C:/Users/Andrey",
+        "HOMEPATH": "/Users/Andrey",
+        "HOMEDRIVE": "C:",
+        "VSLANG": "1033",
+        "LC_ALL": "en_US.UTF-8",
+        "LANG": "en_US.UTF-8"
+      }
+    },
+    {
+      "name": "x64-debug-static",
+      "displayName": "x64 Debug (Static)",
+      "inherits": "base-static",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x64-release-static",
+      "displayName": "x64 Release (Static)",
+      "inherits": "base-static",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ]
+}

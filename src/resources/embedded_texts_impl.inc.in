@@ -1,0 +1,7 @@
+@TEXT_CPP_EXTERNS@
+
+std::vector<EmbeddedTextFile> GetEmbeddedTextFiles() {
+    std::vector<EmbeddedTextFile> outFiles;
+@TEXT_CPP_REGISTRATION@
+    return outFiles;
+}

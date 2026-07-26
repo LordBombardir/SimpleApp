@@ -1,0 +1,35 @@
+{
+  "name": "simple-app",
+  "version": "1.0.0",
+  "builtin-baseline": "cb2981c4e03d421fa03b9bb5044cd1986180e7e4",
+  "dependencies": [
+    {
+      "name": "imgui",
+      "features": [
+        "freetype",
+        "wchar32"
+      ]
+    },
+    {
+      "name": "imgui",
+      "features": [
+        "win32-binding",
+        "dx11-binding"
+      ],
+      "platform": "windows"
+    },
+    {
+      "name": "imgui",
+      "features": [
+        "glfw-binding",
+        "opengl3-binding"
+      ],
+      "platform": "!windows"
+    },
+    {
+      "name": "glfw3",
+      "platform": "!windows"
+    },
+    "nlohmann-json"
+  ]
+}

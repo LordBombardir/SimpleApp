@@ -1,0 +1,25 @@
+#if defined(__APPLE__)
+.section __TEXT,__const
+.globl _binary_JetBrainsMono_Regular_ttf_start
+.globl _binary_JetBrainsMono_Regular_ttf_end
+.globl _binary_NotoColorEmoji_ttf_start
+.globl _binary_NotoColorEmoji_ttf_end
+#else
+.section .rodata
+.globl _binary_JetBrainsMono_Regular_ttf_start
+.globl _binary_JetBrainsMono_Regular_ttf_end
+.globl _binary_NotoColorEmoji_ttf_start
+.globl _binary_NotoColorEmoji_ttf_end
+#endif
+
+.p2align 4
+_binary_JetBrainsMono_Regular_ttf_start:
+    .incbin "@JETBRAINS_MONO_TTF@"
+_binary_JetBrainsMono_Regular_ttf_end:
+
+.p2align 4
+_binary_NotoColorEmoji_ttf_start:
+    .incbin "@NOTO_EMOJI_TTF@"
+_binary_NotoColorEmoji_ttf_end:
+
+@TEXT_RESOURCE_ASM_CONTENT@
