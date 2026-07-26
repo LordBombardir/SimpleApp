@@ -3,6 +3,13 @@
 #include <GLFW/glfw3.h>
 #include <stdexcept>
 
+#if !defined(_WIN32) && !defined(__APPLE__)
+#define GLFW_EXPOSE_NATIVE_X11
+#include <GLFW/glfw3native.h>
+#include <X11/Xlib.h>
+#include <X11/extensions/shape.h>
+#endif
+
 #ifdef IsMaximized
 #undef IsMaximized
 #endif
@@ -47,6 +54,7 @@ public:
         glfwSwapInterval(1); // Enable VSync
 
         glfwSetFramebufferSizeCallback(m_window, [](GLFWwindow*, int, int) {});
+        UpdateNativeWindowRounding();
 
         return true;
     }
@@ -125,6 +133,7 @@ public:
             } else {
                 glfwMaximizeWindow(m_window);
             }
+            UpdateNativeWindowRounding();
         }
     }
 
@@ -260,6 +269,7 @@ public:
 
             glfwSetWindowPos(m_window, newX, newY);
             glfwSetWindowSize(m_window, newW, newH);
+            UpdateNativeWindowRounding();
             return;
         }
 
@@ -277,6 +287,44 @@ public:
                 m_resizeStartWinH   = winH;
             }
         }
+    }
+
+    void UpdateNativeWindowRounding() {
+#if !defined(_WIN32) && !defined(__APPLE__)
+        if (!m_window) return;
+        Display* display = glfwGetX11Display();
+        Window   xwindow = glfwGetX11Window(m_window);
+        if (!display || !xwindow) return;
+
+        int width = 0, height = 0;
+        GetSize(width, height);
+        if (width <= 0 || height <= 0) return;
+
+        if (IsMaximized()) {
+            XShapeCombineMask(display, xwindow, ShapeBounding, 0, 0, None, ShapeSet);
+            return;
+        }
+
+        const int radius = 10;
+        Pixmap mask = XCreatePixmap(display, xwindow, width, height, 1);
+        GC gc = XCreateGC(display, mask, 0, nullptr);
+
+        XSetForeground(display, gc, 0);
+        XFillRectangle(display, mask, gc, 0, 0, width, height);
+
+        XSetForeground(display, gc, 1);
+        XFillRectangle(display, mask, gc, radius, 0, width - 2 * radius, height);
+        XFillRectangle(display, mask, gc, 0, radius, width, height - 2 * radius);
+        XFillArc(display, mask, gc, 0, 0, radius * 2, radius * 2, 90 * 64, 90 * 64);
+        XFillArc(display, mask, gc, width - radius * 2, 0, radius * 2, radius * 2, 0 * 64, 90 * 64);
+        XFillArc(display, mask, gc, 0, height - radius * 2, radius * 2, radius * 2, 180 * 64, 90 * 64);
+        XFillArc(display, mask, gc, width - radius * 2, height - radius * 2, radius * 2, radius * 2, 270 * 64, 90 * 64);
+
+        XShapeCombineMask(display, xwindow, ShapeBounding, 0, 0, mask, ShapeSet);
+
+        XFreeGC(display, gc);
+        XFreePixmap(display, mask);
+#endif
     }
 
     void                 SetApp(std::shared_ptr<App> app) override { m_app = app; }

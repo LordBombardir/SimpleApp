@@ -75,11 +75,14 @@ else()
     
     find_package(glfw3 CONFIG REQUIRED)
     find_package(OpenGL REQUIRED)
+    find_package(X11)
     
     target_link_libraries(SimpleApp PRIVATE
         imgui::imgui
         glfw
         OpenGL::GL
+        ${X11_Xext_LIB}
+        Xext
     )
     target_compile_definitions(SimpleApp PRIVATE IMGUI_USE_WCHAR32)
 endif()
