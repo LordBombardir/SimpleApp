@@ -1,0 +1,183 @@
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }}, ${{ matrix.vcpkg_triplet }}, ${{ matrix.mode }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            vcpkg_triplet: x64-windows-static
+            mode: release
+          - os: windows-latest
+            vcpkg_triplet: x64-windows-static
+            mode: debug
+          - os: ubuntu-latest
+            vcpkg_triplet: x64-linux
+            mode: release
+          - os: ubuntu-latest
+            vcpkg_triplet: x64-linux
+            mode: debug
+
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.vcpkg_triplet }}
+      VCPKG_DEFAULT_HOST_TRIPLET: ${{ matrix.vcpkg_triplet }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux GUI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
+
+      - name: Setup CMake & Ninja
+        uses: lukka/get-cmake@latest
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.mode }}
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }}
+          -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build Project
+        run: cmake --build build --config ${{ matrix.mode }}
+
+      - name: Install Staging
+        run: cmake --install build --prefix staging --config ${{ matrix.mode }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ github.sha }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}
+          path: staging/
+
+  update-release-notes:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: extract-release-notes
+        uses: ffurrer2/extract-release-notes@v3
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          body: |
+            ${{ steps.extract-release-notes.outputs.release_notes }}
+
+  upload-to-release:
+    needs:
+      - build
+      - update-release-notes
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vcpkg_triplet: x64-windows-static
+            mode: release
+            ext: zip
+          - vcpkg_triplet: x64-windows-static
+            mode: debug
+            ext: zip
+          - vcpkg_triplet: x64-linux
+            mode: release
+            ext: tar.gz
+          - vcpkg_triplet: x64-linux
+            mode: debug
+            ext: tar.gz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ github.event.repository.name }}-${{ github.sha }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}
+          path: artifact
+
+      - run: |
+          for f in CHANGELOG.md LICENSE README.md README.ru.md; do
+            if [ -f "$f" ]; then cp "$f" artifact/; fi
+          done
+
+      - name: Create Archive
+        run: |
+          ARCHIVE_NAME="${{ github.event.repository.name }}-${{ github.event.release.tag_name }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.${{ matrix.ext }}"
+          cd artifact
+          if [ "${{ matrix.ext }}" = "zip" ]; then
+            zip -r "../${ARCHIVE_NAME}" *
+          else
+            tar -czvf "../${ARCHIVE_NAME}" *
+          fi
+
+      - name: Calculate SHA256
+        id: calculate-sha256
+        run: |
+          ARCHIVE_NAME="${{ github.event.repository.name }}-${{ github.event.release.tag_name }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.${{ matrix.ext }}"
+          echo release=$(sha256sum ${ARCHIVE_NAME} | awk '{print $1}') >> $GITHUB_OUTPUT
+
+      - name: Prepare SHA row
+        run: |
+          ARCHIVE_NAME="${{ github.event.repository.name }}-${{ github.event.release.tag_name }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.${{ matrix.ext }}"
+          echo "| ${ARCHIVE_NAME} | ${{ steps.calculate-sha256.outputs.release }} |" > sha-row.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sha-row-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}
+          path: sha-row.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            ${{ github.event.repository.name }}-${{ github.event.release.tag_name }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.${{ matrix.ext }}
+
+  finalize-release-body:
+    needs: upload-to-release
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sha-row-*
+          merge-multiple: true
+          path: rows
+
+      - id: collect-sha-rows
+        run: |
+          find rows -name "sha-row.txt" -exec cat {} \; > table_rows.txt
+
+          {
+            echo "rows<<EOF"
+            echo ""
+            echo "## Checksums (SHA-256)"
+            echo "| File | SHA256 |"
+            echo "| ---- | ------ |"
+            cat table_rows.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          append_body: true
+          tag_name: ${{ github.event.release.tag_name }}
+          body: ${{ steps.collect-sha-rows.outputs.rows }}
