@@ -8,6 +8,18 @@
 #include <GLFW/glfw3native.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/shape.h>
+#ifdef Window
+#undef Window
+#endif
+#ifdef Cursor
+#undef Cursor
+#endif
+#ifdef Status
+#undef Status
+#endif
+#ifdef None
+#undef None
+#endif
 #endif
 
 #ifdef IsMaximized
@@ -292,8 +304,8 @@ public:
     void UpdateNativeWindowRounding() {
 #if !defined(_WIN32) && !defined(__APPLE__)
         if (!m_window) return;
-        Display* display = glfwGetX11Display();
-        Window   xwindow = glfwGetX11Window(m_window);
+        ::Display* display = glfwGetX11Display();
+        ::Window   xwindow = glfwGetX11Window(m_window);
         if (!display || !xwindow) return;
 
         int width = 0, height = 0;
@@ -301,13 +313,13 @@ public:
         if (width <= 0 || height <= 0) return;
 
         if (IsMaximized()) {
-            XShapeCombineMask(display, xwindow, ShapeBounding, 0, 0, None, ShapeSet);
+            XShapeCombineMask(display, xwindow, ShapeBounding, 0, 0, 0, ShapeSet);
             return;
         }
 
         const int radius = 10;
-        Pixmap mask = XCreatePixmap(display, xwindow, width, height, 1);
-        GC gc = XCreateGC(display, mask, 0, nullptr);
+        ::Pixmap  mask   = XCreatePixmap(display, xwindow, width, height, 1);
+        ::GC      gc     = XCreateGC(display, mask, 0, nullptr);
 
         XSetForeground(display, gc, 0);
         XFillRectangle(display, mask, gc, 0, 0, width, height);
