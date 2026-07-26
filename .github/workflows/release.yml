@@ -30,7 +30,7 @@ jobs:
       VCPKG_DEFAULT_HOST_TRIPLET: ${{ matrix.vcpkg_triplet }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -63,7 +63,7 @@ jobs:
       - name: Install Staging
         run: cmake --install build --prefix staging --config ${{ matrix.mode }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ github.event.repository.name }}-${{ github.sha }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}
           path: staging/
@@ -73,7 +73,7 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - id: extract-release-notes
         uses: ffurrer2/extract-release-notes@v3
@@ -108,9 +108,9 @@ jobs:
             ext: tar.gz
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ github.event.repository.name }}-${{ github.sha }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}
           path: artifact
@@ -141,12 +141,12 @@ jobs:
           ARCHIVE_NAME="${{ github.event.repository.name }}-${{ github.event.release.tag_name }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.${{ matrix.ext }}"
           echo "| ${ARCHIVE_NAME} | ${{ steps.calculate-sha256.outputs.release }} |" > sha-row.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sha-row-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}
           path: sha-row.txt
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.event.release.tag_name }}
           files: |
@@ -158,9 +158,9 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: sha-row-*
           merge-multiple: true
