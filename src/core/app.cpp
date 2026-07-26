@@ -456,14 +456,17 @@ void App::Render() {
     glClear(GL_COLOR_BUFFER_BIT);
 
     ImFontAtlas* atlas = ImGui::GetIO().Fonts;
-    if (atlas && atlas->IsBuilt() && atlas->TexID) {
-        GLuint fontTexId = static_cast<GLuint>(reinterpret_cast<uintptr_t>(atlas->TexID));
-        glBindTexture(GL_TEXTURE_2D, fontTexId);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    if (atlas && atlas->IsBuilt()) {
+        ImTextureID fontTex = atlas->TexRef.GetTexID();
+        if (fontTex != 0) {
+            GLuint fontTexId = static_cast<GLuint>((uintptr_t)fontTex);
+            glBindTexture(GL_TEXTURE_2D, fontTexId);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 #ifdef GL_TEXTURE_MAX_ANISOTROPY_EXT
-        glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0f);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 16.0f);
 #endif
+        }
     }
 
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
