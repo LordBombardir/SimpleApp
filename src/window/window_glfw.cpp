@@ -363,9 +363,6 @@ public:
 #endif
 
 private:
-    void UpdateBorderResizing();
-    void UpdateNativeWindowRounding();
-
     enum class ResizeEdge { None, Left, Right, Top, Bottom, TopLeft, TopRight, BottomLeft, BottomRight };
 
     ResizeEdge GetResizeEdgeAt(double cursorX, double cursorY, int winW, int winH) const {
