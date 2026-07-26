@@ -37,10 +37,10 @@ void UrlUtils::OpenURL(const std::string& rawUrl) {
     ShellExecuteA(nullptr, "open", safeUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 #elif defined(__APPLE__)
     std::string cmd = "open \"" + safeUrl + "\" &";
-    ::system(cmd.c_str());
+    (void)::system(cmd.c_str());
 #else
     std::string cmd = "xdg-open \"" + safeUrl + "\" &";
-    ::system(cmd.c_str());
+    (void)::system(cmd.c_str());
 #endif
 }
 

@@ -418,7 +418,7 @@ PerformanceSnapshot SystemMetricsCollector::GetPerformanceSnapshot() {
     std::ifstream statFile("/proc/stat");
     std::string   statLine;
     if (std::getline(statFile, statLine) && statLine.rfind("cpu ", 0) == 0) {
-        uint64_t user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0;
+        unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0;
         if (sscanf(
                 statLine.c_str(),
                 "cpu %llu %llu %llu %llu %llu %llu %llu %llu",
