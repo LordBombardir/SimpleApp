@@ -198,7 +198,7 @@ public:
     }
 
     void StartDragging() override {
-        if (!m_window) return;
+        if (!m_window || m_isResizing) return;
 
         if (IsMaximized()) {
             int winX = 0, winY = 0;
@@ -235,7 +235,10 @@ public:
     }
 
     void UpdateDragging() override {
-        if (!m_window) return;
+        if (!m_window || m_isResizing) {
+            m_isDragging = false;
+            return;
+        }
 
         double cursorX = 0.0, cursorY = 0.0;
         glfwGetCursorPos(m_window, &cursorX, &cursorY);
@@ -277,6 +280,7 @@ public:
 
         // Border resizing
         if (m_isResizing) {
+            m_isDragging = false;
             if (!isLeftPressed) {
                 m_isResizing = false;
                 m_resizeEdge = ResizeEdge::None;
