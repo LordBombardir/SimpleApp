@@ -53,6 +53,7 @@ public:
 
     bool ProcessMessages() override {
         glfwPollEvents();
+        UpdateBorderResizing();
         return !glfwWindowShouldClose(m_window);
     }
 
