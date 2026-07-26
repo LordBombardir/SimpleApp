@@ -1,6 +1,7 @@
 #include "window/native_window.h"
 #include "window/window.h"
 #include <GLFW/glfw3.h>
+#include <imgui.h>
 #include <stdexcept>
 
 #if !defined(_WIN32) && !defined(__APPLE__)
@@ -36,6 +37,12 @@ public:
     explicit GlfwNativeWindow(Window* parent) : m_parent(parent) {}
 
     ~GlfwNativeWindow() override {
+        if (m_cursorArrow) glfwDestroyCursor(m_cursorArrow);
+        if (m_cursorResizeEW) glfwDestroyCursor(m_cursorResizeEW);
+        if (m_cursorResizeNS) glfwDestroyCursor(m_cursorResizeNS);
+        if (m_cursorResizeNWSE && m_cursorResizeNWSE != m_cursorResizeEW) glfwDestroyCursor(m_cursorResizeNWSE);
+        if (m_cursorResizeNESW && m_cursorResizeNESW != m_cursorResizeNS) glfwDestroyCursor(m_cursorResizeNESW);
+
         if (m_window) {
             glfwDestroyWindow(m_window);
         }
@@ -59,6 +66,17 @@ public:
 
         m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
         if (!m_window) return false;
+
+        m_cursorArrow    = glfwCreateStandardCursor(GLFW_ARROW_CURSOR);
+        m_cursorResizeEW = glfwCreateStandardCursor(GLFW_HRESIZE_CURSOR);
+        m_cursorResizeNS = glfwCreateStandardCursor(GLFW_VRESIZE_CURSOR);
+#if defined(GLFW_RESIZE_NWSE_CURSOR)
+        m_cursorResizeNWSE = glfwCreateStandardCursor(GLFW_RESIZE_NWSE_CURSOR);
+        m_cursorResizeNESW = glfwCreateStandardCursor(GLFW_RESIZE_NESW_CURSOR);
+#else
+        m_cursorResizeNWSE = m_cursorResizeEW;
+        m_cursorResizeNESW = m_cursorResizeNS;
+#endif
 
         GLFWmonitor* primary = glfwGetPrimaryMonitor();
         if (primary) {
@@ -262,7 +280,28 @@ public:
             if (!isLeftPressed) {
                 m_isResizing = false;
                 m_resizeEdge = ResizeEdge::None;
+                glfwSetCursor(m_window, m_cursorArrow);
                 return;
+            }
+
+            ImGuiMouseCursor imguiCursor = ImGuiMouseCursor_Arrow;
+            GLFWcursor*      glfwCursor  = m_cursorArrow;
+            if (m_resizeEdge == ResizeEdge::Left || m_resizeEdge == ResizeEdge::Right) {
+                imguiCursor = ImGuiMouseCursor_ResizeEW;
+                glfwCursor  = m_cursorResizeEW;
+            } else if (m_resizeEdge == ResizeEdge::Top || m_resizeEdge == ResizeEdge::Bottom) {
+                imguiCursor = ImGuiMouseCursor_ResizeNS;
+                glfwCursor  = m_cursorResizeNS;
+            } else if (m_resizeEdge == ResizeEdge::TopLeft || m_resizeEdge == ResizeEdge::BottomRight) {
+                imguiCursor = ImGuiMouseCursor_ResizeNWSE;
+                glfwCursor  = m_cursorResizeNWSE;
+            } else if (m_resizeEdge == ResizeEdge::TopRight || m_resizeEdge == ResizeEdge::BottomLeft) {
+                imguiCursor = ImGuiMouseCursor_ResizeNESW;
+                glfwCursor  = m_cursorResizeNESW;
+            }
+            ImGui::SetMouseCursor(imguiCursor);
+            if (m_window && glfwCursor) {
+                glfwSetCursor(m_window, glfwCursor);
             }
 
             double screenMouseX = winX + cursorX;
@@ -317,15 +356,37 @@ public:
         // Hover detection for border resizing
         if (!IsMaximized() && m_resizeEnabled) {
             ResizeEdge edge = GetResizeEdgeAt(cursorX, cursorY, winW, winH);
-            if (edge != ResizeEdge::None && isLeftPressed && !m_isResizing && !m_isDragging) {
-                m_isResizing        = true;
-                m_resizeEdge        = edge;
-                m_resizeStartMouseX = winX + cursorX;
-                m_resizeStartMouseY = winY + cursorY;
-                m_resizeStartWinX   = winX;
-                m_resizeStartWinY   = winY;
-                m_resizeStartWinW   = winW;
-                m_resizeStartWinH   = winH;
+            if (edge != ResizeEdge::None) {
+                ImGuiMouseCursor imguiCursor = ImGuiMouseCursor_Arrow;
+                GLFWcursor*      glfwCursor  = m_cursorArrow;
+                if (edge == ResizeEdge::Left || edge == ResizeEdge::Right) {
+                    imguiCursor = ImGuiMouseCursor_ResizeEW;
+                    glfwCursor  = m_cursorResizeEW;
+                } else if (edge == ResizeEdge::Top || edge == ResizeEdge::Bottom) {
+                    imguiCursor = ImGuiMouseCursor_ResizeNS;
+                    glfwCursor  = m_cursorResizeNS;
+                } else if (edge == ResizeEdge::TopLeft || edge == ResizeEdge::BottomRight) {
+                    imguiCursor = ImGuiMouseCursor_ResizeNWSE;
+                    glfwCursor  = m_cursorResizeNWSE;
+                } else if (edge == ResizeEdge::TopRight || edge == ResizeEdge::BottomLeft) {
+                    imguiCursor = ImGuiMouseCursor_ResizeNESW;
+                    glfwCursor  = m_cursorResizeNESW;
+                }
+                ImGui::SetMouseCursor(imguiCursor);
+                if (m_window && glfwCursor) {
+                    glfwSetCursor(m_window, glfwCursor);
+                }
+
+                if (isLeftPressed && !m_isResizing && !m_isDragging) {
+                    m_isResizing        = true;
+                    m_resizeEdge        = edge;
+                    m_resizeStartMouseX = winX + cursorX;
+                    m_resizeStartMouseY = winY + cursorY;
+                    m_resizeStartWinX   = winX;
+                    m_resizeStartWinY   = winY;
+                    m_resizeStartWinW   = winW;
+                    m_resizeStartWinH   = winH;
+                }
             }
         }
     }
@@ -384,11 +445,11 @@ private:
     enum class ResizeEdge { None, Left, Right, Top, Bottom, TopLeft, TopRight, BottomLeft, BottomRight };
 
     ResizeEdge GetResizeEdgeAt(double cursorX, double cursorY, int winW, int winH) const {
-        const double MARGIN = 8.0;
-        bool left   = cursorX >= 0.0 && cursorX <= MARGIN;
-        bool right  = cursorX >= (winW - MARGIN) && cursorX <= winW;
-        bool top    = cursorY >= 0.0 && cursorY <= MARGIN;
-        bool bottom = cursorY >= (winH - MARGIN) && cursorY <= winH;
+        const double MARGIN = 10.0;
+        bool left   = cursorX >= -5.0 && cursorX <= MARGIN;
+        bool right  = cursorX >= (winW - MARGIN) && cursorX <= (winW + 5.0);
+        bool top    = cursorY >= -5.0 && cursorY <= MARGIN;
+        bool bottom = cursorY >= (winH - MARGIN) && cursorY <= (winH + 5.0);
 
         if (top && left) return ResizeEdge::TopLeft;
         if (top && right) return ResizeEdge::TopRight;
@@ -403,6 +464,11 @@ private:
     }
 
     GLFWwindow*        m_window              = nullptr;
+    GLFWcursor*        m_cursorArrow         = nullptr;
+    GLFWcursor*        m_cursorResizeEW      = nullptr;
+    GLFWcursor*        m_cursorResizeNS      = nullptr;
+    GLFWcursor*        m_cursorResizeNWSE    = nullptr;
+    GLFWcursor*        m_cursorResizeNESW    = nullptr;
     std::weak_ptr<App> m_app;
     Window*              m_parent              = nullptr;
     int                  m_minWidth            = 900;
