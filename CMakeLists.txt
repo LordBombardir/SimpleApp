@@ -81,9 +81,10 @@ else()
         imgui::imgui
         glfw
         OpenGL::GL
-        ${X11_Xext_LIB}
-        Xext
     )
+    if(X11_FOUND AND X11_Xext_LIB)
+        target_link_libraries(SimpleApp PRIVATE ${X11_Xext_LIB})
+    endif()
     target_compile_definitions(SimpleApp PRIVATE IMGUI_USE_WCHAR32)
 endif()
 
