@@ -60,12 +60,30 @@ public:
         m_window = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
         if (!m_window) return false;
 
+        GLFWmonitor* primary = glfwGetPrimaryMonitor();
+        if (primary) {
+            int monitorX = 0, monitorY = 0, monitorW = 0, monitorH = 0;
+            glfwGetMonitorWorkarea(primary, &monitorX, &monitorY, &monitorW, &monitorH);
+            int posX = monitorX + (monitorW - width) / 2;
+            int posY = monitorY + (monitorH - height) / 2;
+            glfwSetWindowPos(m_window, posX, posY);
+        }
+
         glfwSetWindowSizeLimits(m_window, m_minWidth, m_minHeight, GLFW_DONT_CARE, GLFW_DONT_CARE);
 
         glfwMakeContextCurrent(m_window);
         glfwSwapInterval(1); // Enable VSync
 
-        glfwSetFramebufferSizeCallback(m_window, [](GLFWwindow*, int, int) {});
+        glfwSetWindowUserPointer(m_window, this);
+        glfwSetWindowSizeCallback(m_window, [](GLFWwindow* win, int, int) {
+            auto* self = static_cast<GlfwNativeWindow*>(glfwGetWindowUserPointer(win));
+            if (self) self->UpdateNativeWindowRounding();
+        });
+        glfwSetWindowMaximizeCallback(m_window, [](GLFWwindow* win, int) {
+            auto* self = static_cast<GlfwNativeWindow*>(glfwGetWindowUserPointer(win));
+            if (self) self->UpdateNativeWindowRounding();
+        });
+
         UpdateNativeWindowRounding();
 
         return true;
@@ -85,7 +103,7 @@ public:
 
     void GetSize(int& width, int& height) const override {
         if (m_window) {
-            glfwGetFramebufferSize(m_window, &width, &height);
+            glfwGetWindowSize(m_window, &width, &height);
         } else {
             width  = 0;
             height = 0;
