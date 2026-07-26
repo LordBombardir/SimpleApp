@@ -13,11 +13,11 @@
 #include "window/native_window.h"
 #include "window/window.h"
 
+#ifdef _WIN32
 #include "imgui_impl_dx11.h"
 #include "imgui_impl_win32.h"
 #include <d3d11.h>
-
-#ifndef _WIN32
+#else
 #include "imgui_impl_opengl3.h"
 #include <GL/gl.h>
 #endif
@@ -62,6 +62,8 @@ void App::InitImGui() {
 #ifdef _WIN32
     ImGui_ImplWin32_Init(m_window->GetImpl()->GetHWND());
     ImGui_ImplDX11_Init(m_window->GetImpl()->GetD3DDevice(), m_window->GetImpl()->GetD3DDeviceContext());
+#else
+    ImGui_ImplOpenGL3_Init("#version 330");
 #endif
 }
 
