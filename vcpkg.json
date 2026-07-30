@@ -30,6 +30,7 @@
       "name": "glfw3",
       "platform": "!windows"
     },
-    "nlohmann-json"
+    "nlohmann-json",
+    "mimalloc"
   ]
 }
