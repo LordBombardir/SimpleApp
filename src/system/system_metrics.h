@@ -30,6 +30,7 @@ public:
 
     const SystemInfo&   GetStaticInfo();
     PerformanceSnapshot GetPerformanceSnapshot();
+    void                SetGpuModel(const std::string& gpuModel);
 
 private:
     SystemMetricsCollector();
@@ -55,9 +56,8 @@ private:
     uint64_t m_lastProcUser   = 0;
     uint64_t m_lastTime       = 0;
 #else
-    uint64_t m_lastLinuxTotal  = 0;
-    uint64_t m_lastLinuxActive = 0;
-    uint64_t m_lastLinuxProc   = 0;
+    uint64_t                              m_lastProcMicroSec = 0;
+    std::chrono::steady_clock::time_point m_lastProcTime;
 #endif
 };
 

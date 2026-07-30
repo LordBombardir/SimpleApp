@@ -1,6 +1,8 @@
+#include "system/system_metrics.h"
 #include "window/native_window.h"
 #include "window/window.h"
 #include <GLFW/glfw3.h>
+#include <GL/gl.h>
 #include <imgui.h>
 #include <stdexcept>
 
@@ -91,6 +93,11 @@ public:
 
         glfwMakeContextCurrent(m_window);
         glfwSwapInterval(1); // Enable VSync
+
+        const char* glRenderer = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+        if (glRenderer && glRenderer[0] != '\0') {
+            system::SystemMetricsCollector::Instance().SetGpuModel(glRenderer);
+        }
 
         glfwSetWindowUserPointer(m_window, this);
         glfwSetWindowSizeCallback(m_window, [](GLFWwindow* win, int, int) {

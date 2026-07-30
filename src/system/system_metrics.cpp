@@ -5,7 +5,9 @@
 #endif
 #include <windows.h>
 #include <psapi.h>
+#include <dxgi.h>
 #else
+#include <sys/resource.h>
 #include <sys/statvfs.h>
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
@@ -101,6 +103,30 @@ static std::string GetWindowsOSName() {
     return osDetails;
 }
 
+static std::string GetDirectXGpuName() {
+    IDXGIFactory* pFactory = nullptr;
+    if (SUCCEEDED(CreateDXGIFactory(__uuidof(IDXGIFactory), reinterpret_cast<void**>(&pFactory))) && pFactory) {
+        IDXGIAdapter* pAdapter = nullptr;
+        if (SUCCEEDED(pFactory->EnumAdapters(0, &pAdapter)) && pAdapter) {
+            DXGI_ADAPTER_DESC desc;
+            if (SUCCEEDED(pAdapter->GetDesc(&desc))) {
+                pAdapter->Release();
+                pFactory->Release();
+
+                int mbLen = WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, nullptr, 0, nullptr, nullptr);
+                if (mbLen > 0) {
+                    std::string gpuName(mbLen - 1, '\0');
+                    WideCharToMultiByte(CP_UTF8, 0, desc.Description, -1, gpuName.data(), mbLen, nullptr, nullptr);
+                    return gpuName;
+                }
+            }
+            pAdapter->Release();
+        }
+        pFactory->Release();
+    }
+    return "";
+}
+
 static uint64_t FileTimeToUint64(const FILETIME& ft) {
     return (static_cast<uint64_t>(ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
 }
@@ -140,6 +166,12 @@ static std::string GetLinuxOSName() {
     return !osName.empty() ? osName : "Linux OS";
 }
 #endif
+
+void SystemMetricsCollector::SetGpuModel(const std::string& gpuModel) {
+    if (!gpuModel.empty()) {
+        m_staticInfo.gpuModel = gpuModel;
+    }
+}
 
 SystemMetricsCollector& SystemMetricsCollector::Instance() {
     static SystemMetricsCollector instance;
@@ -187,19 +219,8 @@ void SystemMetricsCollector::FetchStaticInfo() {
         m_staticInfo.cpuModel = "x86_64 Processor";
     }
 
-    // GPU Model
-    std::string gpuName = ReadRegistryString(
-        HKEY_LOCAL_MACHINE,
-        L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0000",
-        L"DriverDesc"
-    );
-    if (gpuName.empty()) {
-        gpuName = ReadRegistryString(
-            HKEY_LOCAL_MACHINE,
-            L"SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\0001",
-            L"DriverDesc"
-        );
-    }
+    // GPU Model (Native DXGI API)
+    std::string gpuName   = GetDirectXGpuName();
     m_staticInfo.gpuModel = !gpuName.empty() ? gpuName : "DirectX 11 Graphics Adapter";
 
     // Disk Info
@@ -276,14 +297,9 @@ void SystemMetricsCollector::FetchStaticInfo() {
         m_staticInfo.cpuModel = "x86_64 Processor";
     }
 
-    // GPU Model
-    std::string gpuVendor = ReadFileFirstLine("/sys/class/drm/card0/device/vendor");
-    std::string gpuDevice = ReadFileFirstLine("/sys/class/drm/card0/device/device");
-    if (!gpuVendor.empty() && !gpuDevice.empty()) {
-        m_staticInfo.gpuModel = "GPU " + gpuVendor + ":" + gpuDevice;
-    } else {
-        std::string driver    = ReadFileFirstLine("/sys/class/drm/card0/device/driver/module/drivers");
-        m_staticInfo.gpuModel = !driver.empty() ? ("GPU (" + driver + ")") : "OpenGL Device";
+    // GPU Model (Updated natively via OpenGL context)
+    if (m_staticInfo.gpuModel.empty()) {
+        m_staticInfo.gpuModel = "OpenGL Device";
     }
 
     // Disk Info
@@ -386,90 +402,47 @@ PerformanceSnapshot SystemMetricsCollector::GetPerformanceSnapshot() {
         m_lastProcUser   = procU;
     }
 #else
-    // RAM Metrics from /proc/meminfo
-    std::ifstream memFile("/proc/meminfo");
-    std::string   memLine;
-    size_t        totalKb = 0, availKb = 0;
-    while (std::getline(memFile, memLine)) {
-        if (memLine.rfind("MemTotal:", 0) == 0) {
-            sscanf(memLine.c_str(), "MemTotal: %zu kB", &totalKb);
-        } else if (memLine.rfind("MemAvailable:", 0) == 0) {
-            sscanf(memLine.c_str(), "MemAvailable: %zu kB", &availKb);
-        }
-    }
-    if (totalKb > availKb) {
-        snap.systemRamTotalMB = totalKb / 1024;
-        snap.systemRamUsedMB  = (totalKb - availKb) / 1024;
+    // RAM Metrics using sysinfo system call
+    struct sysinfo sysInfo;
+    if (sysinfo(&sysInfo) == 0) {
+        uint64_t memUnit  = sysInfo.mem_unit ? sysInfo.mem_unit : 1;
+        uint64_t totalRam = static_cast<uint64_t>(sysInfo.totalram) * memUnit;
+        uint64_t freeRam  = static_cast<uint64_t>(sysInfo.freeram + sysInfo.bufferram) * memUnit;
+
+        snap.systemRamTotalMB = static_cast<size_t>(totalRam / (1024 * 1024));
+        snap.systemRamUsedMB  = static_cast<size_t>((totalRam > freeRam ? totalRam - freeRam : 0) / (1024 * 1024));
     }
 
-    // Process RAM from /proc/self/status
-    std::ifstream procStatus("/proc/self/status");
-    std::string   statusLine;
-    while (std::getline(procStatus, statusLine)) {
-        if (statusLine.rfind("VmRSS:", 0) == 0) {
-            size_t rssKb = 0;
-            sscanf(statusLine.c_str(), "VmRSS: %zu kB", &rssKb);
-            snap.processRamUsedMB = rssKb / 1024;
-            break;
-        }
+    // Process RAM using getrusage (ru_maxrss in KB)
+    struct rusage usage;
+    if (getrusage(RUSAGE_SELF, &usage) == 0) {
+        snap.processRamUsedMB = static_cast<size_t>(usage.ru_maxrss / 1024);
     }
 
-    // CPU Metrics from /proc/stat
-    std::ifstream statFile("/proc/stat");
-    std::string   statLine;
-    if (std::getline(statFile, statLine) && statLine.rfind("cpu ", 0) == 0) {
-        unsigned long long user = 0, nice = 0, system = 0, idle = 0, iowait = 0, irq = 0, softirq = 0, steal = 0;
-        if (sscanf(
-                statLine.c_str(),
-                "cpu %llu %llu %llu %llu %llu %llu %llu %llu",
-                &user,
-                &nice,
-                &system,
-                &idle,
-                &iowait,
-                &irq,
-                &softirq,
-                &steal
-            )
-            >= 4) {
-            uint64_t totalTime  = user + nice + system + idle + iowait + irq + softirq + steal;
-            uint64_t activeTime = totalTime - (idle + iowait);
+    // Process & System CPU Metrics via getrusage and sysinfo
+    struct rusage procUsage;
+    if (getrusage(RUSAGE_SELF, &procUsage) == 0) {
+        uint64_t userUs      = static_cast<uint64_t>(procUsage.ru_utime.tv_sec) * 1000000 + procUsage.ru_utime.tv_usec;
+        uint64_t sysUs       = static_cast<uint64_t>(procUsage.ru_stime.tv_sec) * 1000000 + procUsage.ru_stime.tv_usec;
+        uint64_t totalProcUs = userUs + sysUs;
 
-            if (m_lastLinuxTotal > 0 && totalTime > m_lastLinuxTotal) {
-                uint64_t totalDiff  = totalTime - m_lastLinuxTotal;
-                uint64_t activeDiff = (activeTime >= m_lastLinuxActive) ? (activeTime - m_lastLinuxActive) : 0;
-                float    rawSysCpu  = static_cast<float>(activeDiff * 100.0 / totalDiff);
-                m_smoothedCpu       = (m_smoothedCpu == 0.0f) ? rawSysCpu : (m_smoothedCpu * 0.85f + rawSysCpu * 0.15f);
-            }
-
-            m_lastLinuxTotal  = totalTime;
-            m_lastLinuxActive = activeTime;
-        }
-    }
-
-    // Process CPU from /proc/self/stat
-    std::ifstream procStat("/proc/self/stat");
-    if (procStat.is_open()) {
-        std::string token;
-        for (int i = 1; i <= 13; ++i) procStat >> token;
-        uint64_t utime = 0, stime = 0;
-        procStat >> utime >> stime;
-        uint64_t procTicks = utime + stime;
-
-        if (m_lastLinuxProc > 0 && m_lastLinuxTotal > 0) {
-            uint64_t procDiff  = (procTicks >= m_lastLinuxProc) ? (procTicks - m_lastLinuxProc) : 0;
-            uint64_t totalDiff = (m_lastLinuxTotal > 0 && procStat) ? (m_lastLinuxTotal - m_lastLinuxProc) : 0;
-            if (m_lastLinuxTotal > 0) {
-                totalDiff = m_lastLinuxTotal;
-            }
-            if (procDiff > 0) {
-                long ticksPerSec = sysconf(_SC_CLK_TCK);
-                float rawProcCpu = (ticksPerSec > 0) ? static_cast<float>(procDiff * 100.0 / (ticksPerSec * m_numProcessors)) : 0.0f;
-                m_smoothedProcCpu =
-                    (m_smoothedProcCpu == 0.0f) ? rawProcCpu : (m_smoothedProcCpu * 0.85f + rawProcCpu * 0.15f);
+        if (m_lastProcMicroSec > 0) {
+            auto elapsedUs = std::chrono::duration_cast<std::chrono::microseconds>(now - m_lastProcTime).count();
+            if (elapsedUs > 0 && m_numProcessors > 0) {
+                uint64_t procUsDiff = (totalProcUs >= m_lastProcMicroSec) ? (totalProcUs - m_lastProcMicroSec) : 0;
+                float    rawProcCpu = static_cast<float>(procUsDiff * 100.0 / (elapsedUs * m_numProcessors));
+                m_smoothedProcCpu   = (m_smoothedProcCpu == 0.0f) ? rawProcCpu : (m_smoothedProcCpu * 0.85f + rawProcCpu * 0.15f);
             }
         }
-        m_lastLinuxProc = procTicks;
+        m_lastProcMicroSec = totalProcUs;
+        m_lastProcTime     = now;
+    }
+
+    struct sysinfo sysInfoCpu;
+    if (sysinfo(&sysInfoCpu) == 0) {
+        float loadAvg   = static_cast<float>(sysInfoCpu.loads[0]) / 65536.0f;
+        float rawSysCpu = (m_numProcessors > 0) ? (loadAvg / m_numProcessors) * 100.0f : 0.0f;
+        m_smoothedCpu   = (m_smoothedCpu == 0.0f) ? rawSysCpu : (m_smoothedCpu * 0.85f + rawSysCpu * 0.15f);
     }
 #endif
 
