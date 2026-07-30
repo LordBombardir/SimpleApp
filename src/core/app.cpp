@@ -24,6 +24,8 @@
 #include <GL/gl.h>
 #endif
 
+#include <mimalloc.h>
+
 #include <algorithm>
 #include <cmath>
 
@@ -33,6 +35,7 @@ App::App(std::shared_ptr<Window> window) : m_window(window) {
     TextManager::Instance().Initialize();
     InitImGui();
     LoadFonts();
+    mi_collect(true);
 }
 
 App::~App() {
