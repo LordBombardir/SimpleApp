@@ -15,6 +15,7 @@ add_compile_options($<$<CXX_COMPILER_ID:MSVC>:/utf-8>)
 
 find_package(imgui CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
+find_package(mimalloc CONFIG REQUIRED)
 
 # -----------------------------------------------------------------------------
 # Modular CMake Modules
@@ -58,7 +59,7 @@ set(SOURCE_FILES
 
 if (WIN32)
     list(APPEND SOURCE_FILES src/window/window_win32.cpp)
-    add_executable(SimpleApp WIN32 ${SOURCE_FILES})
+    add_executable(${PROJECT_NAME} WIN32 ${SOURCE_FILES})
     
     target_link_libraries(SimpleApp PRIVATE 
         imgui::imgui 
@@ -68,30 +69,30 @@ if (WIN32)
         dwmapi 
         uxtheme
     )
-    target_compile_definitions(SimpleApp PRIVATE UNICODE _UNICODE IMGUI_USE_WCHAR32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE UNICODE _UNICODE IMGUI_USE_WCHAR32)
 else()
     list(APPEND SOURCE_FILES src/window/window_glfw.cpp)
-    add_executable(SimpleApp ${SOURCE_FILES})
+    add_executable(${PROJECT_NAME} ${SOURCE_FILES})
     
     find_package(glfw3 CONFIG REQUIRED)
     find_package(OpenGL REQUIRED)
     find_package(X11)
     
-    target_link_libraries(SimpleApp PRIVATE
+    target_link_libraries(${PROJECT_NAME} PRIVATE
         imgui::imgui
         glfw
         OpenGL::GL
     )
     if(X11_FOUND)
-        target_link_libraries(SimpleApp PRIVATE ${X11_LIBRARIES})
+        target_link_libraries(${PROJECT_NAME} PRIVATE ${X11_LIBRARIES})
         if(X11_Xext_LIB)
-            target_link_libraries(SimpleApp PRIVATE ${X11_Xext_LIB})
+            target_link_libraries(${PROJECT_NAME} PRIVATE ${X11_Xext_LIB})
         endif()
     endif()
-    target_compile_definitions(SimpleApp PRIVATE IMGUI_USE_WCHAR32)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE IMGUI_USE_WCHAR32)
 endif()
 
-target_link_libraries(SimpleApp PRIVATE nlohmann_json::nlohmann_json)
-target_include_directories(SimpleApp PRIVATE src "${GEN_DIR}")
+target_link_libraries(${PROJECT_NAME} PRIVATE nlohmann_json::nlohmann_json mimalloc)
+target_include_directories(${PROJECT_NAME} PRIVATE src "${GEN_DIR}")
 
-install(TARGETS SimpleApp DESTINATION .)
+install(TARGETS ${PROJECT_NAME} DESTINATION .)
