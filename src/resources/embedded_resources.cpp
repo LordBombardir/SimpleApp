@@ -7,13 +7,10 @@
 #include <windows.h>
 
 #define IDR_FONT_JETBRAINS_MONO 101
-#define IDR_FONT_NOTO_EMOJI     102
 #else
 extern "C" {
 extern const unsigned char _binary_JetBrainsMono_Regular_ttf_start[];
 extern const unsigned char _binary_JetBrainsMono_Regular_ttf_end[];
-extern const unsigned char _binary_NotoColorEmoji_ttf_start[];
-extern const unsigned char _binary_NotoColorEmoji_ttf_end[];
 }
 #endif
 
@@ -37,20 +34,10 @@ static bool GetWin32Resource(int resId, const unsigned char*& outData, size_t& o
 bool GetEmbeddedFontJetBrainsMono(const unsigned char*& outData, size_t& outSize) {
     return GetWin32Resource(IDR_FONT_JETBRAINS_MONO, outData, outSize);
 }
-
-bool GetEmbeddedFontNotoEmoji(const unsigned char*& outData, size_t& outSize) {
-    return GetWin32Resource(IDR_FONT_NOTO_EMOJI, outData, outSize);
-}
 #else
 bool GetEmbeddedFontJetBrainsMono(const unsigned char*& outData, size_t& outSize) {
     outData = _binary_JetBrainsMono_Regular_ttf_start;
     outSize = static_cast<size_t>(_binary_JetBrainsMono_Regular_ttf_end - _binary_JetBrainsMono_Regular_ttf_start);
-    return (outData != nullptr && outSize > 0);
-}
-
-bool GetEmbeddedFontNotoEmoji(const unsigned char*& outData, size_t& outSize) {
-    outData = _binary_NotoColorEmoji_ttf_start;
-    outSize = static_cast<size_t>(_binary_NotoColorEmoji_ttf_end - _binary_NotoColorEmoji_ttf_start);
     return (outData != nullptr && outSize > 0);
 }
 #endif

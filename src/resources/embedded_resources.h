@@ -13,7 +13,6 @@ struct EmbeddedTextFile {
 };
 
 bool GetEmbeddedFontJetBrainsMono(const unsigned char*& outData, size_t& outSize);
-bool GetEmbeddedFontNotoEmoji(const unsigned char*& outData, size_t& outSize);
 
 std::vector<EmbeddedTextFile> GetEmbeddedTextFiles();
 
