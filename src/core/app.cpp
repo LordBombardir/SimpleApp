@@ -86,8 +86,8 @@ void App::LoadFonts() {
 
     ImFontConfig fontConfig;
     fontConfig.FontDataOwnedByAtlas = false;
-    fontConfig.OversampleH          = 3;
-    fontConfig.OversampleV          = 3;
+    fontConfig.OversampleH          = 1;
+    fontConfig.OversampleV          = 1;
     fontConfig.PixelSnapH           = true;
 
     const unsigned char* fontData     = nullptr;
