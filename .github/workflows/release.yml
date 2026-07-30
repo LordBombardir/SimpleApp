@@ -139,12 +139,12 @@ jobs:
       - name: Prepare SHA row
         run: |
           ARCHIVE_NAME="${{ github.event.repository.name }}-${{ github.event.release.tag_name }}-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.${{ matrix.ext }}"
-          echo "| ${ARCHIVE_NAME} | ${{ steps.calculate-sha256.outputs.release }} |" > sha-row.txt
+          echo "| ${ARCHIVE_NAME} | ${{ steps.calculate-sha256.outputs.release }} |" > sha-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.txt
 
       - uses: actions/upload-artifact@v7
         with:
           name: sha-row-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}
-          path: sha-row.txt
+          path: sha-${{ matrix.vcpkg_triplet }}-${{ matrix.mode }}.txt
 
       - uses: softprops/action-gh-release@v3
         with:
@@ -168,7 +168,7 @@ jobs:
 
       - id: collect-sha-rows
         run: |
-          find rows -name "sha-row.txt" -exec cat {} \; > table_rows.txt
+          cat rows/*.txt > table_rows.txt
 
           {
             echo "rows<<EOF"
